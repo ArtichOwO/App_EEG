@@ -70,7 +70,7 @@ function eeg_GUI_f
     'Title','Analysis',...
     'Position',[50 395 630 45]);
     
-    btnPSD = uibutton(analysisPanel,'Text','Spectral Analysis',...
+    btnPSD = uibutton(analysisPanel,'Text','Topo AppEn',...
         'Position',[10 5 110 17],'Enable','off');
     
     btnSTFT = uibutton(analysisPanel,'Text','STFT',...
@@ -90,7 +90,7 @@ function eeg_GUI_f
     % Button callbacks
     % ========================
     btnLoad.ButtonPushedFcn = @(src,event) loadEDF();
-    btnPSD.ButtonPushedFcn = @(src,event) doPSD();
+    btnPSD.ButtonPushedFcn = @(src,event) doTopoAppEn();
     btnSTFT.ButtonPushedFcn = @(src,event) doSTFT();
     btnWavelet.ButtonPushedFcn = @(src,event) doWavelet();
     btnAppEn.ButtonPushedFcn = @(src,event) doAppEn();
@@ -145,6 +145,7 @@ function eeg_GUI_f
     % ========================
     % GET SELECTED SIGNAL
     % ========================
+    % Pour doAppEn
     function [signal, fs, label] = getSelectedSignal()
     
         signal = [];
@@ -209,6 +210,17 @@ function eeg_GUI_f
         signal = signal(iStart:iEnd);
     
     end
+
+
+    % Pour TopoAppEn
+    % Helper to get indices without requiring a specific channel selection
+    function indices = getSelectedSignal_Internal()
+        fs = app.fileinfo.NumSamples(1) / seconds(app.fileinfo.DataRecordDuration);
+        indices = [max(1, edtStart.Value * fs), min(size(app.record,2), edtEnd.Value * fs)];
+    end
+
+
+
 
  % ========================
     % Approximate Entropy (AppEn) over time - VERSION RAPIDE
@@ -327,9 +339,10 @@ function eeg_GUI_f
         
         out = phi_m - phi_m1;
     end
-% ========================
-    % INTEGRATED TOPOGRAPHIC MAP (Full Signal Length)
     % ========================
+    % INTEGRATED TOPOGRAPHIC MAP AMP
+    % ========================                  % a modifier car intervalle
+    % mauvais
     function doTopoMaps()
         if isempty(app.record)
             uialert(f,'Load an EDF file first','Topo Error');
@@ -341,6 +354,8 @@ function eeg_GUI_f
         indices = round(getSelectedSignal()); 
         idxStart = indices(1);
         idxEnd = indices(2);
+        fprintf("%f   ",idxStart)
+        fprintf("%f",idxEnd)
         
         % Ensure indices are within valid range
         idxStart = max(1, idxStart);
@@ -411,6 +426,83 @@ function eeg_GUI_f
                 'HorizontalAlignment', 'center', 'FontWeight', 'bold', 'Color', 'k', 'FontSize', 8);
         end
     end
+
+    % ========================
+    % TOPOGRAPHIC MAP OF APPROXIMATE ENTROPY (AppEn)
+    % ========================
+    function doTopoAppEn()
+        if isempty(app.record)
+            uialert(f, 'Load an EDF file first', 'Topo Error');
+            return
+        end
+
+        % 1. Get signal segment indices (Full Signal Length)
+        indices = round(getSelectedSignal_Internal()); 
+        idxStart = indices(1);
+        idxEnd = 130 * 256;                                        % 130 is the time in seconds to parametre
+        
+        % 2. Define Electrode Positions (10-20 system)
+        x = [6.5 5.5 5 5.5 6.5 2.1 0.5 2.1 9 11.5 12.5 13 12.5 11.5 15.9 17.5 15.9 9 9]';
+        y = [0.5 4.5 8.5 12.5 16.5 3.5 8.5 13.5 4.5 0.5 4.5 8.5 12.5 16.5 3.5 8.5 13.5 8.5 12.5]';
+        numChannels = length(x);
+
+        % 3. Calculate AppEn for EVERY channel
+        ZdataEntropy = zeros(numChannels, 1);
+        m = 2; % Standard AppEn parameter
+        
+        d = uiprogressdlg(f, 'Title', 'Calculating Topo AppEn', ...
+                             'Message', 'Computing entropy for all electrodes...', ...
+                             'Cancelable', 'on');
+
+        for i = 1:numChannels
+            if d.CancelRequested, break; end
+            
+            % Extract physical signal for current channel
+            fullSignal = convertToPhysical(i);
+            segment = fullSignal(idxStart:idxEnd);
+            
+            % Define 'r' based on the standard deviation of the current segment
+            r = 0.2 * std(segment); 
+            
+            % Use your optimized fast algorithm
+            ZdataEntropy(i) = ApEn_fast_internal(segment, m, r);
+            
+            d.Value = i / numChannels;
+        end
+        close(d);
+
+        % 4. Interpolation & Visualization
+        z = rescale(ZdataEntropy, 0, 1);
+        mapTitle = sprintf('Entropy Map (AppEn) from %.2f to %.2f s', ...
+            edtStart.Value, edtEnd.Value);
+
+        [xq, yq] = meshgrid(0:0.1:18, 0:0.1:18);
+        F = scatteredInterpolant(x, y, z, 'linear', 'none');
+        zq = F(xq, yq);
+
+        % 5. Create Plot
+        fig = figure('Name', mapTitle, 'Color', 'w');
+        ax = axes(fig);
+        surf(ax, xq, yq, zq, 'EdgeColor', 'none'); 
+        hold(ax, 'on');
+        view(ax, 2); shading(ax, 'interp'); colormap(ax, 'parula'); colorbar(ax);
+        axis(ax, 'equal', 'off'); set(ax, 'ydir', 'reverse');
+        title(ax, mapTitle);
+
+        % Head Outline & Labels (Standard settings)
+        theta = -2*pi : 0.01 : 2*pi;
+        plot3(ax, 8.5*cos(theta)+9, 8.5*sin(theta)+8.5, ones(size(theta))*2, 'LineWidth', 12, 'Color', [0.9 0.9 0.9]); 
+        plot3(ax, 8*cos(theta)+9, 8*sin(theta)+8.5, ones(size(theta))*2.1, 'LineWidth', 2, 'Color', 'k');
+        plot3(ax, [8.5 9 9.5], [0.1 -0.5 0.1], [3 3 3], 'k', 'LineWidth', 2); % Nose
+        
+        xLabels = [6.5 5.5 5 5.5 6.5 3 1.5 3 9 11.5 12.5 13 12.5 11.5 15 16.5 15 9 9];
+        yLabels = [1.5 4.5 8.5 12.5 15.5 4 8.5 13 4.5 1.5 4.5 8.5 12.5 15.5 4 8.5 13 8.5 12.5];
+        for i = 1:numChannels
+            lbl = erase(app.hdr.label{i}, ["EEG", "-LE", "_LE", "LE"]);
+            text(ax, xLabels(i), yLabels(i), 5, lbl, 'HorizontalAlignment', 'center', 'FontWeight', 'bold', 'FontSize', 8);
+        end
+    end
+
     % ========================
     % STFT (Short-time Fourier Transform)
     % ========================
