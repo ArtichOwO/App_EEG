@@ -136,6 +136,10 @@ function eeg_GUI_f
         updateChannelDropdown(ddRegion.Value);
         plotSelectedChannel(ddChannel.Value);
 
+        % Update signal duration value :
+        duration_total = app.fileinfo.NumDataRecords * seconds(app.fileinfo.DataRecordDuration);
+        edtEnd.Value = duration_total;
+
     end
 
     % ========================
@@ -206,8 +210,8 @@ function eeg_GUI_f
     
     end
 
-    % ========================
-    % Approximate Entropy (AppEn)
+ % ========================
+    % Approximate Entropy (AppEn) over time - VERSION RAPIDE
     % ========================
     function doAppEn()
         
@@ -217,92 +221,196 @@ function eeg_GUI_f
             return
         end
 
+        % -------------------------
+        % Paramètres de la fenêtre glissante
+        % -------------------------
+        % Note : Pour un signal long (351s), augmenter step_size_sec si besoin
+        win_size_sec = 2;   
+        step_size_sec = 1;  
+        
+        win_size = round(win_size_sec * fs);
+        step_size = round(step_size_sec * fs);
+        
+        N = length(signal);
+        
+        if N < win_size
+            uialert(f, 'Le signal sélectionné est trop court.', 'Erreur AppEn');
+            return;
+        end
+        
+        n_windows = floor((N - win_size) / step_size) + 1;
+        appEn_vals = zeros(1, n_windows);
+        t_centers = zeros(1, n_windows);
+        
+        % Paramètres de l'algorithme
         m = 2;
-        r = 0.2 * std(signal);
-    
-        value = apen_calc(signal,m,r);
+        r = 0.2 * std(signal); 
+        tStart = edtStart.Value; 
 
-        uialert(f,...
-            sprintf('Approximate Entropy = %.5f',value),...
-            ['AppEn - ',label]);
-    
+        % -------------------------
+        % Calcul avec barre de progression
+        % -------------------------
+        d = uiprogressdlg(f, 'Title', 'Calcul de l''AppEn (Mode Rapide)', ...
+                             'Message', 'Analyse des fenêtres en cours...', ...
+                             'Cancelable', 'on');
+        
+        for k = 1:n_windows
+            if d.CancelRequested
+                break;
+            end
+            
+            idx_start = (k-1)*step_size + 1;
+            idx_end = idx_start + win_size - 1;
+            segment = signal(idx_start:idx_end);
+            
+            % Appel de la nouvelle fonction optimisée
+            appEn_vals(k) = ApEn_fast_internal(segment, m, r);
+            
+            t_centers(k) = tStart + (idx_start + win_size/2) / fs;
+            d.Value = k / n_windows;
+        end
+        
+        close(d); 
+        
+        if k < n_windows
+            appEn_vals = appEn_vals(1:k-1);
+            t_centers = t_centers(1:k-1);
+            if isempty(appEn_vals), return; end
+        end
+
+        % -------------------------
+        % Affichage
+        % -------------------------
+        figure('Name', ['AppEn Fast - ', label], 'Color', 'w');
+        plot(t_centers, appEn_vals, '-o', 'LineWidth', 1.5, 'MarkerFaceColor', 'b');
+        title(sprintf('Entropie Approximative (Fast) - Voie %s (r=%.2f)', label, r));
+        xlabel('Temps (s)');
+        ylabel('AppEn');
+        grid on;
     end
 
     % ========================
-    % TOPOGRAPHIC MAPS
+    % ALGORITHME VECTORISÉ (ApEn_fast)
+    % ========================
+    function out = ApEn_fast_internal(u, m, r)
+        N_seg = length(u);
+        
+        % --- Calcul pour m ---
+        n = N_seg - m + 1;
+        X = zeros(n, m);
+        for k_m = 1:m
+            X(:,k_m) = u(k_m : N_seg - m + k_m);
+        end
+        
+        C = zeros(n,1);
+        for i = 1:n
+            % Calcul de distance Chebyshev vectorisé
+            D = max(abs(X - X(i,:)), [], 2);
+            C(i) = sum(D <= r) / n;
+        end
+        phi_m = mean(log(C));
+        
+        % --- Calcul pour m+1 ---
+        m2 = m + 1;
+        n2 = N_seg - m2 + 1;
+        X2 = zeros(n2, m2);
+        for k_m = 1:m2
+            X2(:,k_m) = u(k_m : N_seg - m2 + k_m);
+        end
+        
+        C2 = zeros(n2,1);
+        for i = 1:n2
+            D2 = max(abs(X2 - X2(i,:)), [], 2);
+            C2(i) = sum(D2 <= r) / n2;
+        end
+        phi_m1 = mean(log(C2));
+        
+        out = phi_m - phi_m1;
+    end
+% ========================
+    % INTEGRATED TOPOGRAPHIC MAP (Full Signal Length)
     % ========================
     function doTopoMaps()
-
-        EEG = buildEEGstruct();
-        if isempty(EEG)
+        if isempty(app.record)
+            uialert(f,'Load an EDF file first','Topo Error');
             return
         end
-    
-        fs = EEG.srate;
-    
-        tStart = edtStart.Value;
-        tEnd   = edtEnd.Value;
-    
-        iStart = max(1, round(tStart*fs));
-        iEnd   = min(EEG.pnts, round(tEnd*fs));
-    
-        data_segment = EEG.data(:, iStart:iEnd);
-    
-        % -------------------------
-        % remove channels without position
-        % -------------------------
-        valid_chan = false(length(EEG.chanlocs),1);
-    
-        for i = 1:length(EEG.chanlocs)
-            if isfield(EEG.chanlocs(i),'X') && ...
-               isfield(EEG.chanlocs(i),'Y') && ...
-               isfield(EEG.chanlocs(i),'Z') && ...
-               ~isempty(EEG.chanlocs(i).X) && ...
-               ~isempty(EEG.chanlocs(i).Y) && ...
-               ~isempty(EEG.chanlocs(i).Z)
-                valid_chan(i) = true;
-            end
-        end
-    
-        data_segment = data_segment(valid_chan,:);
-        chanlocs = EEG.chanlocs(valid_chan);
-    
-        % -------------------------
-        % map parameters
-        % -------------------------
-        n_maps = 10;
-        win_width = (tEnd - tStart) / n_maps;
-        step = (tEnd - tStart - win_width) / (n_maps - 1);
-        window_centers = tStart + win_width/2 + (0:n_maps-1)*step;
-    
-        % -------------------------
-        % plot maps
-        % -------------------------
-        figure('Color','w','Name','Topographic maps');
-        sgtitle("Topographic maps");
-    
-        for k = 1:n_maps
-            t1 = window_centers(k) - win_width/2;
-            t2 = window_centers(k) + win_width/2;
-    
-            i1 = max(1, round((t1 - tStart)*fs)+1);
-            i2 = min(size(data_segment,2), round((t2 - tStart)*fs));
-    
-            mean_data = mean(data_segment(:, i1:i2), 2);
-    
-            subplot(ceil(n_maps/5),5,k);
-            topoplot(mean_data(:), chanlocs,...
-                'electrodes','on',...
-                'style','both');
-    
-            title(sprintf('%.0f–%.0f ms', t1*1000, t2*1000));
-    
-        end
-    
-        cbar;
-    
-    end
 
+        % 1. Get the signal segment indices using the existing app function
+        % FIX: Force indices to be integers using round() to prevent indexing error
+        indices = round(getSelectedSignal()); 
+        idxStart = indices(1);
+        idxEnd = indices(2);
+        
+        % Ensure indices are within valid range
+        idxStart = max(1, idxStart);
+        idxEnd = min(size(app.record, 2), idxEnd);
+
+        % 2. Define Electrode Positions (10-20 system)
+        x = [6.5 5.5 5 5.5 6.5 2.1 0.5 2.1 9 11.5 12.5 13 12.5 11.5 15.9 17.5 15.9 9 9]';
+        y = [0.5 4.5 8.5 12.5 16.5 3.5 8.5 13.5 4.5 0.5 4.5 8.5 12.5 16.5 3.5 8.5 13.5 8.5 12.5]';
+        numChannels = length(x);
+
+        % 3. Extract and Average Data across the entire segment
+        ZdataRaw = zeros(numChannels, 1);
+        for i = 1:numChannels
+            % Get the physical signal for this channel
+            fullSignal = convertToPhysical(i);
+            
+            % Extract the segment using integer indices
+            segment = fullSignal(idxStart:idxEnd);
+            
+            % Use RMS to represent average activity over the duration
+            ZdataRaw(i) = rms(segment); 
+        end
+
+        % Normalize for color mapping
+        z = rescale(ZdataRaw, 0, 1);
+        mapTitle = sprintf('Topographic Map (RMS) from %.2f to %.2f s', ...
+            edtStart.Value, edtEnd.Value);
+
+        % 4. Interpolation - Create a smooth grid
+        [xq, yq] = meshgrid(0:0.1:18, 0:0.1:18);
+        F = scatteredInterpolant(x, y, z, 'linear', 'none');
+        zq = F(xq, yq);
+
+        % 5. Create Plotting Window
+        fig = figure('Name', mapTitle, 'Color', 'w');
+        ax = axes(fig);
+        
+        % Plot the surface
+        surf(ax, xq, yq, zq, 'EdgeColor', 'none'); 
+        hold(ax, 'on');
+        
+        view(ax, 2); 
+        shading(ax, 'interp');
+        colormap(ax, 'jet');
+        colorbar(ax);
+        axis(ax, 'equal', 'off');
+        set(ax, 'ydir', 'reverse');
+        title(ax, mapTitle);
+
+        % 6. Draw Head Outline
+        theta = -2*pi : 0.01 : 2*pi;
+        cx = 9; cy = 8.5;
+        plot3(ax, 8.5*cos(theta)+cx, 8.5*sin(theta)+cy, ones(size(theta))*2, ...
+              'LineWidth', 12, 'Color', [0.9 0.9 0.9]); 
+        plot3(ax, 8*cos(theta)+cx, 8*sin(theta)+cy, ones(size(theta))*2.1, ...
+              'LineWidth', 2, 'Color', 'k');
+
+        % 7. Add Nose
+        plot3(ax, [8.5 9 9.5], [0.1 -0.5 0.1], [3 3 3], 'k', 'LineWidth', 2);
+
+        % 8. Add Electrode Labels
+        xLabels = [6.5 5.5 5 5.5 6.5 3 1.5 3 9 11.5 12.5 13 12.5 11.5 15 16.5 15 9 9];
+        yLabels = [1.5 4.5 8.5 12.5 15.5 4 8.5 13 4.5 1.5 4.5 8.5 12.5 15.5 4 8.5 13 8.5 12.5];
+        
+        for i = 1:numChannels
+            lbl = erase(app.hdr.label{i}, ["EEG", "-LE", "_LE", "LE"]);
+            text(ax, xLabels(i), yLabels(i), 5, lbl, ...
+                'HorizontalAlignment', 'center', 'FontWeight', 'bold', 'Color', 'k', 'FontSize', 8);
+        end
+    end
     % ========================
     % STFT (Short-time Fourier Transform)
     % ========================
