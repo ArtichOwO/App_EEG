@@ -39,7 +39,7 @@ function TopoEn(app)
         r = 0.2 * std(segment); 
         
         % Use your optimized fast algorithm
-        ZdataEntropy(i) = Analysis.Utils.ApEn_fast_internal(segment, m, r);
+        ZdataEntropy(i) = Utils.ApEn_fast_internal(segment, m, r);
         
         d.Value = i / numChannels;
     end

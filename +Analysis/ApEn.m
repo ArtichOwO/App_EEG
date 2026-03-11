@@ -50,7 +50,7 @@ function ApEn(app)
         segment = signal(idx_start:idx_end);
         
         % Appel de la nouvelle fonction optimisée
-        appEn_vals(k) = Analysis.Utils.ApEn_fast_internal(segment, m, r);
+        appEn_vals(k) = Utils.ApEn_fast_internal(segment, m, r);
         
         t_centers(k) = offset + (idx_start + win_size/2) / fs;
         d.Value = k / n_windows;
