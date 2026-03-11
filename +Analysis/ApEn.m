@@ -67,6 +67,7 @@ function ApEn(app)
     % -------------------------
     % Affichage
     % -------------------------
+    cla(app.Axes, "reset");
     plot(app.Axes, t_centers, appEn_vals, '-o', 'LineWidth', 1.5, 'MarkerFaceColor', 'b');
     title(app.Axes, sprintf('Approximate Entropy (Fast) - %s (r=%.2f)', label, r));
     xlabel(app.Axes, 'Temps (s)');

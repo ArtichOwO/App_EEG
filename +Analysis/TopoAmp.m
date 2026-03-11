@@ -55,7 +55,7 @@ function TopoAmp(app)
     zq = F(xq, yq);
 
     ax = app.Axes;
-    cla(ax);
+    cla(ax, "reset");
     
     % Plot interpolated surface
     surf(ax, xq, yq, zq, 'EdgeColor', 'none'); 
@@ -64,7 +64,8 @@ function TopoAmp(app)
     view(ax, 2); 
     shading(ax, 'interp');
     colormap(ax, 'jet');
-    colorbar(ax);
+    c = colorbar(ax);
+    c.Label.String = "T value";
     axis(ax, 'equal', 'off');
     set(ax, 'ydir', 'reverse');
     title(ax, "Brain Map — Amplitude");

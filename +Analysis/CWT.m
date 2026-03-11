@@ -7,6 +7,7 @@ function CWT(app)
 
     [cfs, F] = cwt(signal, fs);
 
+    cla(app.Axes, "reset");
     imagesc(app.Axes, offset+(0:numel(signal)-1)/fs, F, abs(cfs));
     axis(app.Axes, 'xy');
     title(app.Axes, strcat("CWT — ", label));

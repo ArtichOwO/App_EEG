@@ -55,13 +55,15 @@ function TopoEn(app)
 
     % 5. Create Plot
     ax = app.Axes;
-    cla(ax);
+    cla(ax, "reset");
 
     surf(ax, xq, yq, zq, 'EdgeColor', 'none'); 
     hold(ax, 'on');
     view(ax, 2); shading(ax, 'interp'); colormap(ax, 'parula'); colorbar(ax);
     axis(ax, 'equal', 'off'); set(ax, 'ydir', 'reverse');
     title(ax, mapTitle);
+    c = colorbar(ax);
+    c.Label.String = "T value";
 
     % Head Outline & Labels (Standard settings)
     theta = -2*pi : 0.01 : 2*pi;

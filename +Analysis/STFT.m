@@ -16,6 +16,7 @@ function STFT(app)
 
     % TODO: remplacer par FrequencyRange='onesided'
     pos = f >= 0;
+    cla(app.Axes, "reset");
     imagesc(app.Axes, t+offset, f(pos), mag2db(abs(s(pos, :))));
     title(app.Axes, strcat("STFT — ", label));
     axis(app.Axes, 'xy');
