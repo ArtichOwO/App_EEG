@@ -8,12 +8,8 @@ function out = ApEn_fast_internal(u, m, r)
         X(:,k_m) = u(k_m : N_seg - m + k_m);
     end
     
-    C = zeros(n,1);
-    for i = 1:n
-        % Calcul de distance Chebyshev vectorisé
-        D = max(abs(X - X(i,:)), [], 2);
-        C(i) = sum(D <= r) / n;
-    end
+    D = pdist2(X, X, 'chebychev');
+    C = sum(D <= r, 2) / n;
     phi_m = mean(log(C));
     
     % --- Calcul pour m+1 ---

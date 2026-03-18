@@ -32,7 +32,7 @@ function TopoEn(app)
         if d.CancelRequested, break; end
         
         % Extract physical signal for current channel
-        [signal, ~, ~] = app.getSignal(i);
+        [signal, ~, ~] = Utils.getSignal(app, i);
         segment = app.convertToPhysical(signal);
         
         % Define 'r' based on the standard deviation of the current segment
