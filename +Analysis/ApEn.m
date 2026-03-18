@@ -1,5 +1,5 @@
 function ApEn(app)
-    [signal, fs, offset, label] = app.getSelectedSignal();
+    [signal, fs, offset, label] = Utils.getSelectedSignal(app);
     
     if isempty(signal)
         return

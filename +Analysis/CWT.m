@@ -1,5 +1,5 @@
 function CWT(app)
-    [signal, fs, offset, label] = getSelectedSignal(app);
+    [signal, fs, offset, label] = Utils.getSelectedSignal(app);
 
     if isempty(signal)
         return

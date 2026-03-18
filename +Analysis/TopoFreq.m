@@ -40,7 +40,7 @@ function TopoFreq(app)
     % --- Extract segment and compute bandpower ---
     ZdataRaw = zeros(numChannels, 1);
     for i = 1:numChannels
-        [signal, ~, ~] = app.getSignal(i);
+        [signal, ~, ~] = Utils.getSignal(app, i);
         segment = app.convertToPhysical(signal);
         segment = double(segment()); % ensure double
         segment(isnan(segment) | isinf(segment)) = 0; % replace NaN/Inf

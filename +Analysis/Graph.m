@@ -1,5 +1,5 @@
 function Graph(app)
-    [signals, fs, offset, labels] = app.getSelectedSignals();
+    [signals, fs, offset, labels] = Utils.getSelectedSignals(app);
 
     if isempty(signals)
         return

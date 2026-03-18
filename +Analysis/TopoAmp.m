@@ -39,7 +39,7 @@ function TopoAmp(app)
     ZdataRaw = zeros(numChannels, 1);
     for i = 1:numChannels
         % Get full signal in physical units
-        [signal, ~, ~] = app.getSignal(i);
+        [signal, ~, ~] = Utils.getSignal(app, i);
         segment = app.convertToPhysical(signal);
         
         % Compute band power
