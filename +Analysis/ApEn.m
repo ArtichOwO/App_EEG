@@ -26,11 +26,10 @@ function ApEn(app)
     n_windows = floor((N - win_size) / step_size) + 1;
     appEn_vals = zeros(1, n_windows);
     t_centers = zeros(1, n_windows);
-    offset = offset/fs;
+    %offset = offset/fs;
     
     % Paramètres de l'algorithme
     m = 2;
-    r = 0.2 * std(signal);
 
     % -------------------------
     % Calcul avec barre de progression
@@ -49,6 +48,8 @@ function ApEn(app)
         idx_end = idx_start + win_size - 1;
         segment = signal(idx_start:idx_end);
         
+        r = 0.2 * std(segment);
+        
         % Appel de la nouvelle fonction optimisée
         appEn_vals(k) = Utils.ApEn_fast_internal(segment, m, r);
         
@@ -56,11 +57,11 @@ function ApEn(app)
         d.Value = k / n_windows;
     end
     
-    close(d); 
-    
-    if k < n_windows
-        appEn_vals = appEn_vals(1:k-1);
-        t_centers = t_centers(1:k-1);
+    delete(d);
+
+    if k <= n_windows
+        appEn_vals = appEn_vals(1:k);
+        t_centers = t_centers(1:k);
         if isempty(appEn_vals), return; end
     end
 
@@ -68,10 +69,12 @@ function ApEn(app)
     % Affichage
     % -------------------------
     cla(app.Axes, "reset");
-    plot(app.Axes, t_centers, appEn_vals, '-o', 'LineWidth', 1.5, 'MarkerFaceColor', 'b');
-    title(app.Axes, sprintf('Approximate Entropy (Fast) - %s (r=%.2f)', label, r));
+    plot(app.Axes, t_centers, appEn_vals, '-o', ...
+        LineWidth=1.5, MarkerFaceColor='b');
+    title(app.Axes, ...
+        sprintf('Approximate Entropy - %s (m=%i, r=%.2f)', label, m, r));
     xlabel(app.Axes, 'Temps (s)');
-    ylabel(app.Axes, 'AppEn');
+    ylabel(app.Axes, 'ApEn');
     xlim(app.Axes, "auto");
     ylim(app.Axes, "auto");
     grid(app.Axes, "on");
