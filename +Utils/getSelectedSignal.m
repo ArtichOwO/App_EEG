@@ -9,5 +9,5 @@ function [signal, fs, offset, label] = getSelectedSignal(app)
     end
 
     label = app.ElectrodeList.Value{1};
-    [signal, fs, offset] = app.getSignal(label);
+    [signal, fs, offset] = Utils.getSignal(app, label);
 end
