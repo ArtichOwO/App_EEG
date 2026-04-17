@@ -11,7 +11,7 @@ function ApEn = apEnTable(app, file, filename)
 
     region_means = zeros(nR, nB);
 
-    total_steps = nR * nB * 19;
+    total_steps = nB * 19;
     step = 0;
 
     for b = 1:nB
@@ -33,15 +33,25 @@ function ApEn = apEnTable(app, file, filename)
                 r_val = 0.2 * std(signal);
 
                 Fs = file.Fileinfo.NumSamples(e);
-                win_sec = 1;
+
+                win_sec = 10;
                 win_len = win_sec * Fs;
-
-                num_win = floor(length(signal) / win_len);
-                apen_vals = zeros(num_win, 1);
-
-                for w = 1:num_win
-                    idx = (w-1)*win_len + 1 : w*win_len;
-                    apen_vals(w) = Utils.ApEn_fast_internal(signal(idx), m, r_val);
+                
+                K = 5;
+                
+                L = length(signal);
+                max_start = L - win_len;
+                
+                if max_start <= 0
+                    apen_vals = Utils.ApEn_fast_internal(signal, m, r_val);
+                else
+                    starts = randi(max_start, K, 1);
+                    apen_vals = zeros(K,1);
+                
+                    for k = 1:K
+                        idx = starts(k) : starts(k) + win_len - 1;
+                        apen_vals(k) = Utils.ApEn_fast_internal(signal(idx), m, r_val);
+                    end
                 end
 
                 apen_mean = apen_mean + mean(apen_vals);
