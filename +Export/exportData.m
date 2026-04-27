@@ -18,6 +18,7 @@ function exportData(app)
 
     Filenames = cell(nFiles, 1);
     ApEn = table();
+    WE = table();
 
     d = uiprogressdlg(app.UIFigure, ...
                       Title="Exporting data", Message="Please wait...");
@@ -28,12 +29,13 @@ function exportData(app)
         Filenames{f} = extractBefore(file.Fileinfo.Filename, ".edf");
         
         ApEn = [ApEn; Export.apEnTable(app, file, Filenames{f})];
+        WE = [WE; Export.WETable(app, file, Filenames{f})];
         
         d.Value = min(1, d.Value + 1/nFiles);
     end
     d.Value = 1;
     delete(d);
     
-    T = [table(Filenames) ApEn];
+    T = [table(Filenames) ApEn WE];
     writetable(T, File);
 end
