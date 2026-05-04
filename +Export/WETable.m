@@ -23,7 +23,7 @@ function WE = WETable(app, file, filename)
         we_sum    = 0;
 
         for i = 1:numel(elecnames)
-            val = computeElecWE(app, file, elecnames(i));
+            val = computeElecWE(app, elecnames(i));
             elec_we.(elecnames(i)) = val;
             we_sum = we_sum + val;
 
@@ -55,31 +55,10 @@ function WE = WETable(app, file, filename)
     close(d2);
 end
 
-function val = computeElecWE(app, file, elecname)
+function we = computeElecWE(app, elecname)
     e = app.getElectrodeIndex(elecname);
     signal = Utils.getSignal(app, e);
-    val = computeWE(app, signal);
 
-    %{
-    Fs = file.Fileinfo.NumSamples(e);
-
-    win_len = 5 * Fs;
-    K = 3;
-    max_start = length(signal) - win_len;
-
-    if max_start <= 0
-        val = computeWE(app, signal);
-    else
-        starts = randi(max_start, K, 1);
-        we_vals = arrayfun(@(k) ...
-            computeWE(app, signal(starts(k) : starts(k)+win_len-1)), ...
-            (1:K)');
-        val = mean(we_vals);
-    end
-    %}
-end
-
-function we = computeWE(app, signal)
     N = 7;
     mw = app.MWSel.Value;
 

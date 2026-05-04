@@ -71,14 +71,14 @@ function val = computeElecApEn(app, file, elecname)
     r_val = 0.2 * std(signal);
     Fs = file.Fileinfo.NumSamples(e);
 
-    win_len = 5 * Fs;
+    win_len = 10 * Fs;
     K = 3;
     max_start = length(signal) - win_len;
 
     if max_start <= 0
         apen_vals = Utils.ApEn_fast_internal(signal, m, r_val);
     else
-        starts = randi(max_start, K, 1);
+        starts = round(linspace(1, max_start, K))';
         apen_vals = arrayfun(@(k) ...
             Utils.ApEn_fast_internal(signal(starts(k) : starts(k)+win_len-1), m, r_val), ...
             (1:K)');
