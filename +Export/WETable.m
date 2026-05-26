@@ -15,23 +15,31 @@ function WE = WETable(app, file, filename)
     nElec = sum(cellfun(@(r) numel(fieldnames(app.Regions.(r))), cellstr(regions)));
     step  = 0;
 
-    elec_we = struct();
-
     for r = 1:nR
-        region    = regions(r);
+        region = regions(r);
         elecnames = string(fieldnames(app.Regions.(region)));
-        we_sum    = 0;
-
-        for i = 1:numel(elecnames)
-            val = computeElecWE(app, elecnames(i));
-            elec_we.(elecnames(i)) = val;
-            we_sum = we_sum + val;
-
-            step = step + 1;
-            d2.Value = min(1, step / nElec);
+        n = numel(elecnames);
+    
+        signals = cell(n, 1);
+        for i = 1:n
+            e = app.getElectrodeIndex(elecnames(i));
+            signals{i}  = Utils.getSignal(app, e);
         end
+        mw = app.MWSel.Value;
 
-        region_means(r) = we_sum / numel(elecnames);
+        vals = zeros(1, n);
+        parfor i = 1:n
+            vals(i) = computeElecWE(signals{i}, mw);
+        end
+    
+        for i = 1:n
+            elec_we.(elecnames(i)) = vals(i);
+        end
+    
+        region_means(r) = mean(vals);
+    
+        step     = step + n;
+        d2.Value = min(1, step / nElec);
     end
 
     for a = 1:nA
@@ -55,12 +63,8 @@ function WE = WETable(app, file, filename)
     close(d2);
 end
 
-function we = computeElecWE(app, elecname)
-    e = app.getElectrodeIndex(elecname);
-    signal = Utils.getSignal(app, e);
-
+function we = computeElecWE(signal, mw)
     N = 7;
-    mw = app.MWSel.Value;
 
     [C, L] = wavedec(signal, N, mw);
 

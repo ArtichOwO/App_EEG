@@ -12,49 +12,65 @@ function ApEn = apEnTable(app, file, filename)
     nB = numel(bands);
 
     region_means = zeros(nR, nB);
-    asym_means   = zeros(nA, nB);
+    asym_means = zeros(nA, nB);
 
-    nElec = sum(cellfun(@(r) numel(fieldnames(app.Regions.(r))), cellstr(regions)));
-    step  = 0;
+    all_elecnames = string.empty;
+    elec_region_idx = [];
+    for r = 1:nR
+        elecnames = string(fieldnames(app.Regions.(regions(r))));
+        all_elecnames = [all_elecnames; elecnames];
+        elec_region_idx = [elec_region_idx; repmat(r, numel(elecnames), 1)];
+    end
+    nElecTotal = numel(all_elecnames);
+
+    asym_pairs = struct();
+    for a = 1:nA
+        asym_pairs.(asymLabels(a)) = app.AsymPairs.(asymLabels(a));
+    end
 
     for b = 1:nB
         app.BandSel.Value = int2str(b);
-        elec_apen = struct();
 
-        for r = 1:nR
-            region    = regions(r);
-            elecnames = string(fieldnames(app.Regions.(region)));
-            apen_sum  = 0;
-
-            for i = 1:numel(elecnames)
-                val = computeElecApEn(app, file, elecnames(i));
-                elec_apen.(elecnames(i)) = val;
-                apen_sum = apen_sum + val;
-
-                step = step + 1;
-                d2.Value = min(1, step / (nB * nElec));
-            end
-
-            region_means(r, b) = apen_sum / numel(elecnames);
+        signals_flat = cell(nElecTotal, 1);
+        Fs_flat = zeros(nElecTotal, 1);
+        for i = 1:nElecTotal
+            e = app.getElectrodeIndex(all_elecnames(i));
+            signals_flat{i} = Utils.getSignal(app, e);
+            Fs_flat(i) = file.Fileinfo.NumSamples(e);
         end
 
+        vals_flat = zeros(nElecTotal, 1);
+        parfor i = 1:nElecTotal
+            vals_flat(i) = computeElecApEn(signals_flat{i}, Fs_flat(i));
+        end
+
+        elec_apen = struct();
+        for r = 1:nR
+            idx = elec_region_idx == r;
+            region_means(r, b) = mean(vals_flat(idx));
+            elecnames = all_elecnames(idx);
+            vals_r = vals_flat(idx);
+            for i = 1:sum(idx)
+                elec_apen.(elecnames(i)) = vals_r(i);
+            end
+        end
+
+        d2.Value = min(1, b / nB);
+
         for a = 1:nA
-            pairs = app.AsymPairs.(asymLabels(a));
+            pairs = asym_pairs.(asymLabels(a));
             nPairs = size(pairs, 1);
             asym_sum = 0;
-
             for p = 1:nPairs
                 asym_sum = asym_sum + abs(elec_apen.(pairs(p,1)) - elec_apen.(pairs(p,2)));
             end
-
             asym_means(a, b) = asym_sum / nPairs;
         end
     end
 
     [R, ~] = ndgrid(regions, bands);
     [A, Bnd] = ndgrid(asymLabels, bands);
-
-    colNames = [ "ApEn_"+R(:)+"_"+Bnd(:); "ApEn_"+A(:)+"_"+Bnd(:) ];
+    colNames = ["ApEn_"+R(:)+"_"+Bnd(:); "ApEn_"+A(:)+"_"+Bnd(:)];
 
     ApEn = array2table([region_means(:)', asym_means(:)'], ...
            VariableNames = colNames);
@@ -63,15 +79,11 @@ function ApEn = apEnTable(app, file, filename)
     close(d2);
 end
 
-function val = computeElecApEn(app, file, elecname)
-    e = app.getElectrodeIndex(elecname);
-    signal = Utils.getSignal(app, e);
-
+function val = computeElecApEn(signal, Fs)
     m = 2;
     r_val = 0.2 * std(signal);
-    Fs = file.Fileinfo.NumSamples(e);
 
-    win_len = 10 * Fs;
+    win_len = 60 * Fs;
     K = 3;
     max_start = length(signal) - win_len;
 
