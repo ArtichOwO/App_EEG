@@ -9,8 +9,8 @@ function ApEn(app)
     % Paramètres de la fenêtre glissante
     % -------------------------
     % Note : Pour un signal long (351s), augmenter step_size_sec si besoin
-    win_size_sec = 2;   
-    step_size_sec = 1;  
+    win_size_sec = 10;   
+    step_size_sec = 5;  
     
     win_size = round(win_size_sec * fs);
     step_size = round(step_size_sec * fs);
