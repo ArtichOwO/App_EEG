@@ -29,13 +29,13 @@ function ApEn = apEnTable(app, file, filename)
     end
 
     for b = 1:nB
-        app.BandSel.Value = int2str(b);
+        %app.BandSel.Value = int2str(b);
 
         signals_flat = cell(nElecTotal, 1);
         Fs_flat = zeros(nElecTotal, 1);
         for i = 1:nElecTotal
             e = app.getElectrodeIndex(all_elecnames(i));
-            signals_flat{i} = Utils.getSignal(app, e);
+            signals_flat{i} = Utils.getSignal(app, e, b);
             Fs_flat(i) = file.Fileinfo.NumSamples(e);
         end
 
@@ -83,7 +83,7 @@ function val = computeElecApEn(signal, Fs)
     m = 2;
     r_val = 0.2 * std(signal);
 
-    win_len = 60 * Fs;
+    win_len = 1 * Fs;
     K = 3;
     max_start = length(signal) - win_len;
 

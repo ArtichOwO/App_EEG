@@ -1,4 +1,8 @@
-function [signal, fs, offset] = getSignal(app, electrode)
+function [signal, fs, offset] = getSignal(app, electrode, band)
+    arguments
+        app; electrode; band = 0;
+    end
+
     signal = [];
     fs = 0;
     offset = 0;
@@ -24,8 +28,10 @@ function [signal, fs, offset] = getSignal(app, electrode)
     signal = app.convertToPhysical( ...
         cell2mat(app.getFile().Record{:, idx}), idx);
     fs = app.getFile().Fileinfo.NumSamples(idx);
-
-    band = str2double(app.BandSel.Value);
+    
+    if band == 0
+        band = str2double(app.BandSel.Value);
+    end
     if band > 0
         bands = Utils.DWT(signal, app.MWSel.Value);
         signal = bands{band};
