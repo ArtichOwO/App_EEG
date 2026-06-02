@@ -3,7 +3,8 @@ function exportData(app)
         return;
     end
 
-    [FileName, PathName, ~] = uiputfile("*.csv", "Save table as:");
+    [FileName, PathName, ~] = uiputfile( ...
+        ["*.xlsx" "Excel"; "*.csv" "CSV"], "Save table as:");
     if ~ischar(FileName)
         return;
     end
@@ -11,14 +12,10 @@ function exportData(app)
 
     nFiles = app.numberOfFiles();
 
-    file = app.getFile();
-    lbl = strtrim(erase(file.Fileinfo.SignalLabels, ...
-        ["EEG", "-LE", "_LE", "LE"]));
-    lbl = lbl(1:19);
-
     Filenames = cell(nFiles, 1);
-    ApEn = table();
-    WE = table();
+    Type = cell(nFiles, 1);
+    ApEn = cell(nFiles, 1);
+    WE = cell(nFiles, 1);
 
     d = uiprogressdlg(app.UIFigure, ...
                       Title="Exporting data", Message="Please wait...");
@@ -27,15 +24,16 @@ function exportData(app)
         app.selectFile(f);
         file = app.getFile();
         Filenames{f} = extractBefore(file.Fileinfo.Filename, ".edf");
+        Type{f} = strtok(file.Fileinfo.Filename);
         
-        ApEn = [ApEn; Export.apEnTable(app, file, Filenames{f})];
-        WE = [WE; Export.WETable(app, file, Filenames{f})];
+        ApEn{f} = Export.apEnTable(app, file, Filenames{f});
+        WE{f} = Export.WETable(app, file, Filenames{f});
         
         d.Value = min(1, d.Value + 1/nFiles);
     end
     d.Value = 1;
     delete(d);
     
-    T = [table(Filenames) ApEn WE];
+    T = [table(Filenames) table(Type) vertcat(ApEn{:}) vertcat(WE{:})];
     writetable(T, File);
 end
