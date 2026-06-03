@@ -20,13 +20,13 @@ function exportData(app)
     d = uiprogressdlg(app.UIFigure, ...
                       Title="Exporting data", Message="Please wait...");
 
+    ApEn_winlen = 30;
     for f = 1:nFiles
         app.selectFile(f);
         file = app.getFile();
         Filenames{f} = extractBefore(file.Fileinfo.Filename, ".edf");
         Type{f} = strtok(file.Fileinfo.Filename);
-        
-        ApEn{f} = Export.apEnTable(app, file, Filenames{f});
+        ApEn{f} = Export.apEnTable(app, file, Filenames{f}, ApEn_winlen);
         WE{f} = Export.WETable(app, file, Filenames{f});
         
         d.Value = min(1, d.Value + 1/nFiles);
@@ -35,5 +35,15 @@ function exportData(app)
     delete(d);
     
     T = [table(Filenames) table(Type) vertcat(ApEn{:}) vertcat(WE{:})];
-    writetable(T, File);
+    writetable(T, File, Sheet="Features");
+    writetable(table({ ...
+            "ApEn_winlen";
+            "MW";
+            "Date"
+        }, { ...
+            ApEn_winlen;
+            app.MWSel.Value;
+            string(datetime, "dd/MM/yyyy")
+        }, VariableNames=["Parameter", "Value"]), ...
+        File, Sheet="Metadata");
 end

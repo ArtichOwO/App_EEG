@@ -1,4 +1,4 @@
-function ApEn = apEnTable(app, file, filename)
+function ApEn = apEnTable(app, file, filename, winlen)
     d2 = uiprogressdlg(app.UIFigure, ...
         Title   = "Calculating ApEn: " + filename, ...
         Message = "Please wait...");
@@ -12,7 +12,9 @@ function ApEn = apEnTable(app, file, filename)
     nB = numel(bands);
 
     region_means = zeros(nR, nB);
+    region_diff_means = zeros(nR, nB);
     asym_means = zeros(nA, nB);
+    asym_diff_means = zeros(nA, nB);
 
     all_elecnames = string.empty;
     elec_region_idx = [];
@@ -24,13 +26,13 @@ function ApEn = apEnTable(app, file, filename)
     nElecTotal = numel(all_elecnames);
 
     asym_pairs = struct();
+    asym_pairs_diff = struct();
     for a = 1:nA
         asym_pairs.(asymLabels(a)) = app.AsymPairs.(asymLabels(a));
+        asym_pairs_diff.(asymLabels(a)) = app.AsymPairs.(asymLabels(a));
     end
 
     for b = 1:nB
-        %app.BandSel.Value = int2str(b);
-
         signals_flat = cell(nElecTotal, 1);
         Fs_flat = zeros(nElecTotal, 1);
         for i = 1:nElecTotal
@@ -40,18 +42,26 @@ function ApEn = apEnTable(app, file, filename)
         end
 
         vals_flat = zeros(nElecTotal, 1);
+        vals_diff_flat = zeros(nElecTotal, 1);
         parfor i = 1:nElecTotal
-            vals_flat(i) = computeElecApEn(signals_flat{i}, Fs_flat(i));
+             [val, diff] = computeElecApEn( ...
+                 signals_flat{i}, Fs_flat(i), winlen);
+             vals_flat(i) = val;
+             vals_diff_flat(i) = diff;
         end
 
         elec_apen = struct();
+        elec_apen_diff = struct();
         for r = 1:nR
             idx = elec_region_idx == r;
             region_means(r, b) = mean(vals_flat(idx));
+            region_diff_means(r, b) = mean(vals_diff_flat(idx));
             elecnames = all_elecnames(idx);
             vals_r = vals_flat(idx);
+            vals_diff_r = vals_diff_flat(idx);
             for i = 1:sum(idx)
                 elec_apen.(elecnames(i)) = vals_r(i);
+                elec_apen_diff.(elecnames(i)) = vals_diff_r(i);
             end
         end
 
@@ -61,29 +71,43 @@ function ApEn = apEnTable(app, file, filename)
             pairs = asym_pairs.(asymLabels(a));
             nPairs = size(pairs, 1);
             asym_sum = 0;
+            asym_diff_sum = 0;
             for p = 1:nPairs
-                asym_sum = asym_sum + abs(elec_apen.(pairs(p,1)) - elec_apen.(pairs(p,2)));
+                asym_sum = asym_sum ...
+                    + abs(elec_apen.(pairs(p, 1)) - elec_apen.(pairs(p, 2)));
+                asym_diff_sum = asym_diff_sum ...
+                    + abs(elec_apen_diff.(pairs(p, 1)) - elec_apen_diff.(pairs(p, 2)));
             end
             asym_means(a, b) = asym_sum / nPairs;
+            asym_diff_means(a, b) = asym_diff_sum / nPairs;
         end
     end
 
     [R, ~] = ndgrid(regions, bands);
     [A, Bnd] = ndgrid(asymLabels, bands);
-    colNames = ["ApEn_"+R(:)+"_"+Bnd(:); "ApEn_"+A(:)+"_"+Bnd(:)];
+    colNames = [
+        "ApEn_"+R(:)+"_"+Bnd(:);
+        "ApEn_"+R(:)+"_"+Bnd(:)+"_Diff";
+        "ApEn_"+A(:)+"_"+Bnd(:);
+        "ApEn_"+A(:)+"_"+Bnd(:)+"_Diff"
+    ];
 
-    ApEn = array2table([region_means(:)', asym_means(:)'], ...
+    ApEn = array2table([ ...
+                region_means(:)', ...
+                region_diff_means(:)', ...
+                asym_means(:)', ...
+                asym_diff_means(:)'], ...
            VariableNames = colNames);
 
     d2.Value = 1;
     close(d2);
 end
 
-function val = computeElecApEn(signal, Fs)
+function [val, diff] = computeElecApEn(signal, Fs, winlen)
     m = 2;
     r_val = 0.2 * std(signal);
 
-    win_len = 1 * Fs;
+    win_len = winlen * Fs;
     K = 3;
     max_start = length(signal) - win_len;
 
@@ -97,4 +121,5 @@ function val = computeElecApEn(signal, Fs)
     end
 
     val = mean(apen_vals);
+    diff = apen_vals(end) - apen_vals(1);
 end
