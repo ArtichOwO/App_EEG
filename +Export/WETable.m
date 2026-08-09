@@ -69,7 +69,7 @@ function we = computeElecWE(signal, mw)
     [C, L] = wavedec(signal, N, mw);
 
     E = zeros(1, N + 1);
-    for i = 1:N
+    for i = 2:N % skip D1 (like +Utils.DWT)
         coeffs = detcoef(C, L, i);
         E(i) = sum(coeffs .^ 2);
     end

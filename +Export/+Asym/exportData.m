@@ -20,7 +20,7 @@ function exportData(app)
     d = uiprogressdlg(app.UIFigure, ...
                       Title="Exporting data", Message="Please wait...");
 
-    ApEn_winlen = 2;
+    ApEn_winlen = 30;
     for f = 1:nFiles
         app.selectFile(f);
         file = app.getFile();

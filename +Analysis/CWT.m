@@ -5,12 +5,18 @@ function CWT(app)
         return
     end
 
-    [cfs, F] = cwt(signal, fs);
-
     cla(app.Axes, "reset");
-    imagesc(app.Axes, offset+(0:numel(signal)-1)/fs, F, abs(cfs));
-    %surf(app.Axes, offset+(0:numel(signal)-1)/fs, F, abs(cfs));
-    %view(app.Axes, 2);
+    [cfs, F] = cwt(signal, fs);
+    mag = abs(cfs);
+    
+    [F, ord] = sort(F);
+    mag = mag(ord, :);
+    
+    Flin = linspace(F(1), F(end), 200);
+    magLin = interp1(F, mag, Flin);
+    
+    t = offset + (0:numel(signal)-1)/fs;
+    imagesc(app.Axes, t, Flin, magLin);
     
     axis(app.Axes, 'xy');
     title(app.Axes, "CWT — " + label + " (Morse)");
